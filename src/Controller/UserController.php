@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 
 use Doctrine\Persistence\ManagerRegistry;
@@ -29,11 +30,7 @@ class UserController extends AbstractController
     {
         $user = $registry->getRepository(User::class)->find($id);
 
-        $encoders = [new JsonEncoder()];
-        $normalizers = [new ObjectNormalizer()];
-        $serializer = new Serializer($normalizers, $encoders);
-
-        $jsonData = $serializer->serialize($user, 'json');
+        $jsonData = $this->userSerializer->serialize($user, 'json');
 
         return JsonResponse::fromJsonString($jsonData);
     }
@@ -43,11 +40,7 @@ class UserController extends AbstractController
     {
         $users = $registry->getRepository(User::class)->findAll();
 
-        $encoders = [new JsonEncoder()];
-        $normalizers = [new ObjectNormalizer()];
-        $serializer = new Serializer($normalizers, $encoders);
-
-        $jsonData = $serializer->serialize($users, 'json');
+        $jsonData = $this->userSerializer->serialize($users, 'json');
 
         return JsonResponse::fromJsonString($jsonData);
     }
