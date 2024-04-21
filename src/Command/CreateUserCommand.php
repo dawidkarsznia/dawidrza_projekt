@@ -44,12 +44,10 @@ class CreateUserCommand extends Command
 
         // Ask for the first name of the newly created user.
         $firstNameQuestion = new Question('Please enter the first name of the user: ');
-        
         $firstName = $helper->ask($input, $output, $firstNameQuestion);
 
         // Ask for the last name of the newly created user.
         $lastNameQuestion = new Question('Please enter the last name of the user: ');
-        
         $lastName = $helper->ask($input, $output, $lastNameQuestion);
 
         // Ask for the role of the newly created user.
@@ -65,14 +63,12 @@ class CreateUserCommand extends Command
 
         // Ask for the e-mail of the newly created user.
         $emailQuestion = new Question('Please enter the e-mail of the user: ');
-        
         $email = $helper->ask($input, $output, $emailQuestion);
 
         // Ask for the password of the newly create user.
         $passwordQuestion = new Question('Please enter the password of the user: ');
         $passwordQuestion->setHidden(true);
         $passwordQuestion->setHiddenFallback(false);
-        
         $password = $helper->ask($input, $output, $passwordQuestion);
 
         // Create a user with previously specified configuration.

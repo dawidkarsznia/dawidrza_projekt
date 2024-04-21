@@ -15,16 +15,39 @@ use App\Entity\User;
 #[Route('/api', name: 'api_')]
 class UserController extends AbstractController
 {
-    #[Route('/user', name: 'app_user', methods: ['get'])]
-    public function index(ManagerRegistry $registry): JsonResponse
+    private Serializer $userSerializer;
+
+    public function __construct()
     {
-        $products = $registry->getRepository(User::class)->findAll();
+        $encoders = [new JsonEncoder()];
+        $normalizers = [new ObjectNormalizer()];
+        $this->userSerializer = new Serializer($normalizers, $encoders);
+    }
+
+    #[Route('/user/{id}', name: 'app_user', methods: ['get'])]
+    public function getUserInformation(ManagerRegistry $registry, int $id): JsonResponse
+    {
+        $user = $registry->getRepository(User::class)->find($id);
 
         $encoders = [new JsonEncoder()];
         $normalizers = [new ObjectNormalizer()];
         $serializer = new Serializer($normalizers, $encoders);
 
-        $jsonData = $serializer->serialize($products, 'json');
+        $jsonData = $serializer->serialize($user, 'json');
+
+        return JsonResponse::fromJsonString($jsonData);
+    }
+
+    #[Route('/users', name: 'app_users', methods: ['get'])]
+    public function getUsersInformation(ManagerRegistry $registry): JsonResponse
+    {
+        $users = $registry->getRepository(User::class)->findAll();
+
+        $encoders = [new JsonEncoder()];
+        $normalizers = [new ObjectNormalizer()];
+        $serializer = new Serializer($normalizers, $encoders);
+
+        $jsonData = $serializer->serialize($users, 'json');
 
         return JsonResponse::fromJsonString($jsonData);
     }
