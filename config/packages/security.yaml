@@ -13,11 +13,22 @@ security:
         dev:
             pattern: ^/(_(profiler|wdt)|css|images|js)/
             security: false
-        main:
-            lazy: true
+
+        login:
+            pattern: /api/login
             provider: app_user_provider
             http_basic:
                 realm: Secured Area
+
+        api:
+            pattern: ^/api
+            provider: app_user_provider
+            custom_authenticator: App\Security\UserAuthenticator
+
+
+        main:
+            lazy: true
+            provider: app_user_provider
 
             # activate different ways to authenticate
             # https://symfony.com/doc/current/security.html#the-firewall
@@ -28,8 +39,6 @@ security:
     # Easy way to control access for large sections of your site
     # Note: Only the *first* access control that matches will be used
     access_control:
-        # - { path: ^/admin, roles: ROLE_ADMIN }
-        # - { path: ^/profile, roles: ROLE_USER }
         - { path: ^/api, roles: ROLE_USER }
 
 when@test:

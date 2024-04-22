@@ -41,17 +41,34 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
     }
 
     /**
+     * Create the user and add them to the database.
+     */
+    public function update(User $user): void
+    {
+        // Commit the changes to the database.
+        $this->getEntityManager()->persist($user);
+        $this->getEntityManager()->flush();
+    }
+
+    /**
      * Generate a new API key for the given user.
      */
-    public function updateApiKey(User $user): void
+    public function updateApiKey(User $user, string $generatedApiKey): void
     {
-        $generatedApiKey = ByteString::fromRandom(32)->toString();
-
         // Set the API key to the newly generated one.
         $user->setApiKey($generatedApiKey);
 
         // Commit the changes to the database.
         $this->getEntityManager()->persist($user);
+        $this->getEntityManager()->flush();
+    }
+
+    /**
+     * Remove the user from the database.
+     */
+    public function remove(User $user): void
+    {
+        $this->getEntityManager()->remove($user);
         $this->getEntityManager()->flush();
     }
 }
