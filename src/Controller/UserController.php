@@ -17,98 +17,110 @@ use App\Entity\User;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\String\ByteString;
 
+use App\Repository\UserRepository;
+use App\ResponseFormat\ResponseFormatInterface;
+use Doctrine\ORM\EntityManagerInterface;
+
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+
 #[Route('/api', name: 'api_')]
 class UserController extends AbstractController
 {
     public const API_KEY_HEADER_FIELD_NAME = 'Authorization';
 
-    public const API_RESPONSE_STATUS_SUCCESS = 'success';
-    public const API_RESPONSE_STATUS_FAIL = 'fail';
-    public const API_RESPONSE_STATUS_ERROR = 'error';
-
     private Serializer $userSerializer;
+    private UserRepository $userRepository;
 
-    public function __construct(private UserPasswordHasherInterface $passwordHasher)
+    public function __construct(
+        private EntityManagerInterface $entityManager,
+        private UserPasswordHasherInterface $passwordHasher,
+        private ResponseFormatInterface $responseFormat
+        )
     {
+        $this->userRepository = $entityManager->getRepository(User::class);
+
         $encoders = [new JsonEncoder()];
         $normalizers = [new ObjectNormalizer()];
         $this->userSerializer = new Serializer($normalizers, $encoders);
     }
 
-    /**
-     * Create an API response based on the JSend.
-     * See https://github.com/omniti-labs/jsend for more information.
-     */
-    public function createApiResponse(?string $responseData, string $responseStatus = UserController::API_RESPONSE_STATUS_SUCCESS, int $responseCode = Response::HTTP_OK): JsonResponse
-    {
-        $jsonResponse = array();
-
-        $jsonResponse['status'] = $responseStatus;
-        $jsonResponse['data'] = json_decode($responseData);
-
-        return new JsonResponse($jsonResponse, $responseCode);
-    }
-
     #[Route('/login', name: 'app_login', methods: ['get'])]
-    public function loginUser(ManagerRegistry $registry, Request $request): JsonResponse
+    public function loginUser(Request $request): JsonResponse
     {
         $userEmail = $request->headers->get('PHP-AUTH-USER');
-        $user = $registry->getRepository(User::class)->findOneBy(['email' => $userEmail]);
+        $user = $this->userRepository->findOneBy(['email' => $userEmail]);
+        if (null === $user)
+        {
+            $jsonData = json_encode(['message' => 'The desired resource could not be found.']);
+            return $this->responseFormat->createFail($jsonData, Response::HTTP_NOT_FOUND);
+        }
 
         // Get the user attributes.
-        $userAttributes = [
+        $jsonData = json_encode([
             'id' => $user->getId(),
             'email' => $userEmail,
             'apiKey' => $user->getApiKey()
-        ];
+        ]);
 
-        return $this->createApiResponse($userAttributes);
+        return $this->responseFormat->createSuccess($jsonData);
     }
 
     #[Route('/profile', name: 'app_get_profile', methods: ['get'])]
-    public function getUserProfile(ManagerRegistry $registry, Request $request): JsonResponse
+    public function getUserProfile(Request $request): JsonResponse
     {
         $apiKey = $request->headers->get(UserController::API_KEY_HEADER_FIELD_NAME);
-        $user = $registry->getRepository(User::class)->findOneBy(['apiKey' => $apiKey]);
+
+        $user = $this->userRepository->findOneBy(['apiKey' => $apiKey]);
+        if (null === $user)
+        {
+            $jsonData = json_encode(['message' => 'The desired resource could not be found.']);
+            return $this->responseFormat->createFail($jsonData, Response::HTTP_NOT_FOUND);
+        }
 
         $jsonData = $this->userSerializer->serialize($user, 'json', [AbstractNormalizer::IGNORED_ATTRIBUTES => ['userIdentifier', 'password', 'apiKey']]);
 
-        return $this->createApiResponse($jsonData);
+        return $this->responseFormat->createSuccess($jsonData);
     }
     
-    #[Route('/api-key', name: 'app_get_new_key', methods: ['get'])]
-    public function generateApiKey(ManagerRegistry $registry, Request $request): JsonResponse
+    #[Route('/api-key', name: 'app_get_new_key', methods: ['post'])]
+    public function generateApiKey(Request $request): JsonResponse
     {
         $apiKey = $request->headers->get(UserController::API_KEY_HEADER_FIELD_NAME);
-        $user = $registry->getRepository(User::class)->findOneBy(['apiKey' => $apiKey]);
+        $user = $this->userRepository->findOneBy(['apiKey' => $apiKey]);
+        if (null === $user)
+        {
+            $jsonData = json_encode(['message' => 'The desired resource could not be found.']);
+            return $this->responseFormat->createFail($jsonData, Response::HTTP_NOT_FOUND);
+        }
 
         $generatedApiKey = ByteString::fromRandom(32)->toString();
         $user->setApiKey($generatedApiKey);
 
-        $registry->getRepository(User::class)->update($user);
+        $this->userRepository->update($user);
 
-        $jsonData['oldApiKey'] = $apiKey;
-        $jsonData['newApiKey'] = $generatedApiKey;
-        $jsonData = json_encode($jsonData);
+        $jsonData = json_encode([
+            'oldApiKey' => $apiKey,
+            'newApiKey' => $generatedApiKey
+        ]);
 
-        return $this->createApiResponse($jsonData);
+        return $this->responseFormat->createSuccess($jsonData);
     }
 
     #[Route('/users', name: 'app_get_users', methods: ['get'])]
-    public function getUsersInformation(Request $request, ManagerRegistry $registry): JsonResponse
+    public function getUsersInformation(Request $request): JsonResponse
     {
         // Deny access to this function, if the user is not an administrator.
         $this->denyAccessUnlessGranted(User::ROLE_ADMIN);
 
-        $users = $registry->getRepository(User::class)->findAll();
+        $users = $this->userRepository->findAll();
 
         $jsonData = $this->userSerializer->serialize($users, 'json', [AbstractNormalizer::IGNORED_ATTRIBUTES => ['userIdentifier', 'password', 'apiKey']]);
 
-        return $this->createApiResponse($jsonData);
+        return $this->responseFormat->createSuccess($jsonData);
     }
 
     #[Route('/users', name: 'app_add_user', methods: ['post'])]
-    public function addUser(Request $request, ManagerRegistry $registry): JsonResponse
+    public function addUser(Request $request): JsonResponse
     {
         // Deny access to this function, if the user is not an administrator.
         $this->denyAccessUnlessGranted(User::ROLE_ADMIN);
@@ -131,41 +143,58 @@ class UserController extends AbstractController
         $hashedPassword = $this->passwordHasher->hashPassword($user, $generatedPassword);
         $user->setPassword($hashedPassword);
 
-        $registry->getRepository(User::class)->update($user);
+        $this->entityManager->persist($user);
+        $this->entityManager->flush();
 
-        return $this->createApiResponse(null);
+        return $this->responseFormat->createSuccess(null);
     }
 
     #[Route('/users/{id}', name: 'app_get_user', methods: ['get'])]
-    public function getUserInformation(Request $request, ManagerRegistry $registry, int $id): JsonResponse
+    public function getUserInformation(Request $request, int $id): JsonResponse
     {
-        $user = $registry->getRepository(User::class)->find($id);
+        $user = $this->userRepository->find($id);
+        if (null === $user)
+        {
+            $jsonData = json_encode(['message' => 'The desired resource could not be found.']);
+            return $this->responseFormat->createFail($jsonData, Response::HTTP_NOT_FOUND);
+        }
 
         $jsonData = $this->userSerializer->serialize($user, 'json', [AbstractNormalizer::IGNORED_ATTRIBUTES => ['userIdentifier', 'password', 'apiKey']]);
 
-        return $this->createApiResponse($jsonData);
+        return $this->responseFormat->createSuccess($jsonData);
     }
 
     #[Route('/users/{id}', name: 'app_user_delete', methods: ['delete'])]
-    public function deleteUser(Request $request, ManagerRegistry $registry, int $id): JsonResponse
+    public function deleteUser(Request $request, int $id): JsonResponse
     {
         // Deny access to this function, if the user is not an administrator.
         $this->denyAccessUnlessGranted(User::ROLE_ADMIN);
 
-        $user = $registry->getRepository(User::class)->findOneBy(['id' => $id]);
+        $user = $this->userRepository->findOneBy(['id' => $id]);
+        if (null === $user)
+        {
+            $jsonData = json_encode(['message' => 'The desired resource could not be found.']);
+            return $this->responseFormat->createFail($jsonData, Response::HTTP_NOT_FOUND);
+        }
 
-        $registry->getRepository(User::class)->remove($user);
+        $this->userRepository->remove($user);
 
-        return $this->createApiResponse(null);
+        return $this->responseFormat->createSuccess(null);
     }
 
     #[Route('/users/{id}', name: 'app_user_update', methods: ['patch'])]
-    public function updateUser(Request $request, ManagerRegistry $registry, int $id): JsonResponse
+    public function updateUser(Request $request, int $id): JsonResponse
     {
         // Deny access to this function, if the user is not an administrator.
         $this->denyAccessUnlessGranted(User::ROLE_ADMIN);
 
-        $user = $registry->getRepository(User::class)->findOneBy(['id' => $id]);
+        $user = $this->userRepository->findOneBy(['id' => $id]);
+        if (null === $user)
+        {
+            $jsonData = json_encode(['message' => 'The desired resource could not be found.']);
+            return $this->responseFormat->createFail($jsonData, Response::HTTP_NOT_FOUND);
+        }
+
         $jsonRequest = $request->toArray();
 
         // Check whether a new first name has actually been given.
@@ -189,36 +218,61 @@ class UserController extends AbstractController
             $user->setEmail($jsonRequest['lastName']);
         }
 
-        $registry->getRepository(User::class)->update($user);
+        $this->entityManager->persist($user);
+        $this->entityManager->flush();
 
-        return $this->createApiResponse(null);
+        return $this->responseFormat->createSuccess(null);
     }
 
     #[Route('/users/{id}/block', name: 'app_user_block', methods: ['post'])]
-    public function blockUser(Request $request, ManagerRegistry $registry, int $id): JsonResponse
+    public function blockUser(Request $request, int $id): JsonResponse
     {
-        // Deny access to this function, if the user is not an administrator.
-        $this->denyAccessUnlessGranted(User::ROLE_ADMIN);
+        // Check whether the given user is an administrator.
+        if (!$this->isGranted(User::ROLE_ADMIN, null))
+        {
+            $jsonData = json_encode(['message' => 'You are not authorized to access this resource.']);
+            return $this->responseFormat->createFail($jsonData, Response::HTTP_UNAUTHORIZED);
+        }
 
-        $user = $registry->getRepository(User::class)->findOneBy(['id' => $id]);
+        // Find the user by the 'id' provided.
+        $user = $this->userRepository->findOneBy(['id' => $id]);
+        if (null === $user)
+        {
+            $jsonData = json_encode(['message' => 'The desired resource could not be found.']);
+            return $this->responseFormat->createFail($jsonData, Response::HTTP_NOT_FOUND);
+        }
+
         $user->setActive(false);
 
-        $registry->getRepository(User::class)->update($user);
+        $this->entityManager->persist($user);
+        $this->entityManager->flush();
 
-        return $this->createApiResponse(null);
+        return $this->responseFormat->createSuccess(null);
     }
 
     #[Route('/users/{id}/unblock', name: 'app_user_unblock', methods: ['post'])]
-    public function unblockUser(Request $request, ManagerRegistry $registry, int $id): JsonResponse
+    public function unblockUser(Request $request, int $id): JsonResponse
     {
-        // Deny access to this function, if the user is not an administrator.
-        $this->denyAccessUnlessGranted(User::ROLE_ADMIN);
+        // Check whether the given user is an administrator.
+        if (!$this->isGranted(User::ROLE_ADMIN, null))
+        {
+            $jsonData = json_encode(['message' => 'You are not authorized to access this resource.']);
+            return $this->responseFormat->createFail($jsonData, Response::HTTP_UNAUTHORIZED);
+        }
 
-        $user = $registry->getRepository(User::class)->findOneBy(['id' => $id]);
+        // Find the user by the 'id' provided.
+        $user = $this->userRepository->findOneBy(['id' => $id]);
+        if (null === $user)
+        {
+            $jsonData = json_encode(['message' => 'The desired resource could not be found.']);
+            return $this->responseFormat->createFail($jsonData, Response::HTTP_NOT_FOUND);
+        }
+
         $user->setActive(true);
 
-        $registry->getRepository(User::class)->update($user);
+        $this->entityManager->persist($user);
+        $this->entityManager->flush();
 
-        return $this->createApiResponse(null);
+        return $this->responseFormat->createSuccess(null);
     }
 }
