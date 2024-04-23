@@ -40,8 +40,6 @@ final class CreateUserService
             ''
         );
 
-        $this->userRepository->saveUser($user);
-
         return $this->serializer->serialize($user, 'json');
     }
 }

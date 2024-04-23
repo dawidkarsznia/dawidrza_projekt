@@ -27,8 +27,6 @@ final class GeneratePasswordService
 
         $user->setPassword($hashedPassword);
 
-        $this->userRepository->saveUser($user);
-
         // We return the plaintext password to send it to the email later.
         return $plainPassword;
     }

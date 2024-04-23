@@ -72,7 +72,7 @@ final class UpdateUserController extends AbstractController
         return $this->responseFormat->createSuccess(null);
     }
 
-    public function generateUserApiKey(Request $request, int $id): JsonResponse
+    public function resetUserApiKey(Request $request): JsonResponse
     {
         $apiKey = $request->headers->get('Authorization');
         $user = $this->userRepository->findOneBy(['apiKey' => $apiKey]);

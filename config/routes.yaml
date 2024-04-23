@@ -5,15 +5,54 @@ controllers:
 api_user_login:
     path: /api/login
     controller: App\User\Application\Controller\API\LoginUserController::loginUser
+    methods: GET|HEAD
 
 api_user_get_all:
     path: /api/users
     controller: App\User\Application\Controller\API\GetUserController::getUsersInformation
+    methods: GET|HEAD
 
 api_user_get_one:
     path: /api/users/{id}
     controller: App\User\Application\Controller\API\GetUserController::getUserInformation
+    methods: GET|HEAD
 
 api_user_get_profile:
     path: /api/profile
     controller: App\User\Application\Controller\API\GetUserController::getUserProfile
+    methods: GET|HEAD
+
+api_user_create:
+    path: /api/users
+    controller: App\User\Application\Controller\API\CreateUserController::createUser
+    methods: POST
+
+api_user_delete:
+    path: /api/users/{id}
+    controller: App\User\Application\Controller\API\DeleteUserController::deleteUser
+    methods: DELETE
+
+api_user_update:
+    path: /api/users/{id}
+    controller: App\User\Application\Controller\API\UpdateUserController::blockUser
+    methods: PATCH
+
+api_user_reset_password:
+    path: /api/reset-password
+    controller: App\User\Application\Controller\API\UpdateUserController::resetUserPassword
+    methods: POST
+
+api_user_reset_api_key:
+    path: /api/reset-key
+    controller: App\User\Application\Controller\API\UpdateUserController::resetUserApiKey
+    methods: POST
+
+api_user_block:
+    path: /api/users/{id}/block
+    controller: App\User\Application\Controller\API\UpdateUserController::blockUser
+    methods: POST
+
+api_user_unblock:
+    path: /api/users/{id}/unblock
+    controller: App\User\Application\Controller\API\UpdateUserController::unblockUser
+    methods: POST
