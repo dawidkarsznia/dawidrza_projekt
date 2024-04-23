@@ -20,14 +20,10 @@ use Symfony\Component\String\ByteString;
 use App\Repository\UserRepository;
 use App\ResponseFormat\ResponseFormatInterface;
 use Doctrine\ORM\EntityManagerInterface;
-
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
-#[Route('/api', name: 'api_')]
-class UserController extends AbstractController
+class ApiController extends AbstractController
 {
-    public const API_KEY_HEADER_FIELD_NAME = 'Authorization';
-
     private Serializer $userSerializer;
     private UserRepository $userRepository;
 
@@ -44,15 +40,13 @@ class UserController extends AbstractController
         $this->userSerializer = new Serializer($normalizers, $encoders);
     }
 
-    #[Route('/login', name: 'app_login', methods: ['get'])]
     public function loginUser(Request $request): JsonResponse
     {
         $userEmail = $request->headers->get('PHP-AUTH-USER');
         $user = $this->userRepository->findOneBy(['email' => $userEmail]);
         if (null === $user)
         {
-            $jsonData = json_encode(['message' => 'The desired resource could not be found.']);
-            return $this->responseFormat->createFail($jsonData, Response::HTTP_NOT_FOUND);
+            throw new NotFoundHttpException('The desired resource could not be found.');
         }
 
         // Get the user attributes.
@@ -65,16 +59,14 @@ class UserController extends AbstractController
         return $this->responseFormat->createSuccess($jsonData);
     }
 
-    #[Route('/profile', name: 'app_get_profile', methods: ['get'])]
     public function getUserProfile(Request $request): JsonResponse
     {
-        $apiKey = $request->headers->get(UserController::API_KEY_HEADER_FIELD_NAME);
+        $apiKey = $request->headers->get('Authorization');
 
         $user = $this->userRepository->findOneBy(['apiKey' => $apiKey]);
         if (null === $user)
         {
-            $jsonData = json_encode(['message' => 'The desired resource could not be found.']);
-            return $this->responseFormat->createFail($jsonData, Response::HTTP_NOT_FOUND);
+            throw new NotFoundHttpException('The desired resource could not be found.');
         }
 
         $jsonData = $this->userSerializer->serialize($user, 'json', [AbstractNormalizer::IGNORED_ATTRIBUTES => ['userIdentifier', 'password', 'apiKey']]);
@@ -82,15 +74,13 @@ class UserController extends AbstractController
         return $this->responseFormat->createSuccess($jsonData);
     }
     
-    #[Route('/api-key', name: 'app_get_new_key', methods: ['post'])]
     public function generateApiKey(Request $request): JsonResponse
     {
         $apiKey = $request->headers->get(UserController::API_KEY_HEADER_FIELD_NAME);
         $user = $this->userRepository->findOneBy(['apiKey' => $apiKey]);
         if (null === $user)
         {
-            $jsonData = json_encode(['message' => 'The desired resource could not be found.']);
-            return $this->responseFormat->createFail($jsonData, Response::HTTP_NOT_FOUND);
+            throw new NotFoundHttpException('The desired resource could not be found.');
         }
 
         $generatedApiKey = ByteString::fromRandom(32)->toString();
@@ -106,7 +96,6 @@ class UserController extends AbstractController
         return $this->responseFormat->createSuccess($jsonData);
     }
 
-    #[Route('/users', name: 'app_get_users', methods: ['get'])]
     public function getUsersInformation(Request $request): JsonResponse
     {
         // Deny access to this function, if the user is not an administrator.
@@ -119,7 +108,6 @@ class UserController extends AbstractController
         return $this->responseFormat->createSuccess($jsonData);
     }
 
-    #[Route('/users', name: 'app_add_user', methods: ['post'])]
     public function addUser(Request $request): JsonResponse
     {
         // Deny access to this function, if the user is not an administrator.
@@ -149,14 +137,12 @@ class UserController extends AbstractController
         return $this->responseFormat->createSuccess(null);
     }
 
-    #[Route('/users/{id}', name: 'app_get_user', methods: ['get'])]
     public function getUserInformation(Request $request, int $id): JsonResponse
     {
         $user = $this->userRepository->find($id);
         if (null === $user)
         {
-            $jsonData = json_encode(['message' => 'The desired resource could not be found.']);
-            return $this->responseFormat->createFail($jsonData, Response::HTTP_NOT_FOUND);
+            throw new NotFoundHttpException('The desired resource could not be found.');
         }
 
         $jsonData = $this->userSerializer->serialize($user, 'json', [AbstractNormalizer::IGNORED_ATTRIBUTES => ['userIdentifier', 'password', 'apiKey']]);
@@ -164,7 +150,6 @@ class UserController extends AbstractController
         return $this->responseFormat->createSuccess($jsonData);
     }
 
-    #[Route('/users/{id}', name: 'app_user_delete', methods: ['delete'])]
     public function deleteUser(Request $request, int $id): JsonResponse
     {
         // Deny access to this function, if the user is not an administrator.
@@ -173,8 +158,7 @@ class UserController extends AbstractController
         $user = $this->userRepository->findOneBy(['id' => $id]);
         if (null === $user)
         {
-            $jsonData = json_encode(['message' => 'The desired resource could not be found.']);
-            return $this->responseFormat->createFail($jsonData, Response::HTTP_NOT_FOUND);
+            throw new NotFoundHttpException('The desired resource could not be found.');
         }
 
         $this->userRepository->remove($user);
@@ -182,7 +166,6 @@ class UserController extends AbstractController
         return $this->responseFormat->createSuccess(null);
     }
 
-    #[Route('/users/{id}', name: 'app_user_update', methods: ['patch'])]
     public function updateUser(Request $request, int $id): JsonResponse
     {
         // Deny access to this function, if the user is not an administrator.
@@ -191,8 +174,7 @@ class UserController extends AbstractController
         $user = $this->userRepository->findOneBy(['id' => $id]);
         if (null === $user)
         {
-            $jsonData = json_encode(['message' => 'The desired resource could not be found.']);
-            return $this->responseFormat->createFail($jsonData, Response::HTTP_NOT_FOUND);
+            throw new NotFoundHttpException('The desired resource could not be found.');
         }
 
         $jsonRequest = $request->toArray();
@@ -224,7 +206,6 @@ class UserController extends AbstractController
         return $this->responseFormat->createSuccess(null);
     }
 
-    #[Route('/users/{id}/block', name: 'app_user_block', methods: ['post'])]
     public function blockUser(Request $request, int $id): JsonResponse
     {
         // Check whether the given user is an administrator.
@@ -238,8 +219,7 @@ class UserController extends AbstractController
         $user = $this->userRepository->findOneBy(['id' => $id]);
         if (null === $user)
         {
-            $jsonData = json_encode(['message' => 'The desired resource could not be found.']);
-            return $this->responseFormat->createFail($jsonData, Response::HTTP_NOT_FOUND);
+            throw new NotFoundHttpException('The desired resource could not be found.');
         }
 
         $user->setActive(false);
@@ -250,22 +230,13 @@ class UserController extends AbstractController
         return $this->responseFormat->createSuccess(null);
     }
 
-    #[Route('/users/{id}/unblock', name: 'app_user_unblock', methods: ['post'])]
     public function unblockUser(Request $request, int $id): JsonResponse
     {
-        // Check whether the given user is an administrator.
-        if (!$this->isGranted(User::ROLE_ADMIN, null))
-        {
-            $jsonData = json_encode(['message' => 'You are not authorized to access this resource.']);
-            return $this->responseFormat->createFail($jsonData, Response::HTTP_UNAUTHORIZED);
-        }
-
         // Find the user by the 'id' provided.
         $user = $this->userRepository->findOneBy(['id' => $id]);
         if (null === $user)
         {
-            $jsonData = json_encode(['message' => 'The desired resource could not be found.']);
-            return $this->responseFormat->createFail($jsonData, Response::HTTP_NOT_FOUND);
+            throw new NotFoundHttpException('The desired resource could not be found.');
         }
 
         $user->setActive(true);

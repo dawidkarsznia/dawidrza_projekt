@@ -13,11 +13,12 @@ use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPasspor
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\ResponseFormat\ResponseFormatInterface;
 use Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException;
 
 class UserAuthenticator extends AbstractAuthenticator
 {
-    public function __construct(private UserRepository $userRepository)
+    public function __construct(private UserRepository $userRepository, private ResponseFormatInterface $responseFormat)
     {
         
     }
@@ -32,13 +33,13 @@ class UserAuthenticator extends AbstractAuthenticator
         $givenApiKey = $request->headers->get('Authorization');
         if (null === $givenApiKey)
         {
-            throw new CustomUserMessageAuthenticationException('No API token provided');
+            throw new BadRequestHttpException('The API token has not been given.');
         }
 
         $user = $this->userRepository->findOneBy(['apiKey' => $givenApiKey]);
         if (null === $user)
         {
-            throw new CustomUserMessageAuthenticationException('The API token provided is incorrect.');
+            throw new NotFoundHttpException('The desired resource could not be found.');
         }
         
         $userIdentifier = $user->getUserIdentifier();
@@ -53,11 +54,7 @@ class UserAuthenticator extends AbstractAuthenticator
 
     public function onAuthenticationFailure(Request $request, AuthenticationException $exception): ?Response
     {
-        $data = [
-            'message' => strtr($exception->getMessageKey(), $exception->getMessageData())
-        ];
-
-        return new JsonResponse($data, Response::HTTP_UNAUTHORIZED);
+        return null;
     }
 
     //    public function start(Request $request, AuthenticationException $authException = null): Response

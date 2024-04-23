@@ -1,0 +1,48 @@
+users_show:
+    path: /users
+    controller: App\Controller\ApiController::getUsersInformation
+    methods: GET
+
+user_login:
+    path: /login
+    controller: App\Controller\ApiController::loginUser
+
+user_add:
+    path: /users
+    controller: App\Controller\ApiController::addUser
+    methods: POST
+
+user_show:
+    path: /users/{id}
+    controller: App\Controller\ApiController::getUserInformation
+    methods: GET
+
+user_profile:
+    path: /profile
+    controller: App\Controller\ApiController::getUserProfile
+    methods: GET
+
+user_delete:
+    path: /users/{id}
+    controller: App\Controller\ApiController::deleteUser
+    methods: DELETE
+
+user_update:
+    path: /users/{id}
+    controller: App\Controller\ApiController::updateUser
+    methods: PATCH
+
+user_block:
+    path: /users/{id}/block
+    controller: App\Controller\ApiController::blockUser
+    methods: POST
+
+user_unblock:
+    path: /users/{id}/unblock
+    controller: App\Controller\ApiController::unblockUser
+    methods: POST
+
+user_generate_key:
+    path: /api-key
+    controller: App\Controller\ApiController::generateApiKey
+    methods: POST
