@@ -1,9 +1,19 @@
 controllers:
-    resource:
-        path: ../src/Controller/
-        namespace: App\Controller
+    resource: ../src/User/Application/Controller/API
     type: attribute
 
-api:
-    resource: 'routes/api.yaml'
-    prefix: api
+api_user_login:
+    path: /api/login
+    controller: App\User\Application\Controller\API\LoginUserController::loginUser
+
+api_user_get_all:
+    path: /api/users
+    controller: App\User\Application\Controller\API\GetUserController::getUsersInformation
+
+api_user_get_one:
+    path: /api/users/{id}
+    controller: App\User\Application\Controller\API\GetUserController::getUserInformation
+
+api_user_get_profile:
+    path: /api/profile
+    controller: App\User\Application\Controller\API\GetUserController::getUserProfile
