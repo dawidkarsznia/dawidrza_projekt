@@ -9,7 +9,7 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Symfony\Component\Form\Exception\InvalidArgumentException;
 
-final class CreateUserService
+class CreateUserService
 {
     private UserRepositoryInterface $userRepository;
     private UserPasswordHasherInterface $passwordHasher;

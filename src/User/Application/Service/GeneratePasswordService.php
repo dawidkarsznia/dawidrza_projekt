@@ -7,7 +7,7 @@ use App\User\Domain\Repository\UserRepositoryInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\String\ByteString;
 
-final class GeneratePasswordService
+class GeneratePasswordService
 {
     private UserRepositoryInterface $userRepository;
     private UserPasswordHasherInterface $passwordHasher;

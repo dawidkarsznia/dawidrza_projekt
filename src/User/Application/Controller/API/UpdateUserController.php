@@ -2,20 +2,26 @@
 
 namespace App\User\Application\Controller\API;
 
+use App\User\Domain\Entity\User;
+use App\User\Application\ApiResponse\ApiResponseInterface;
 use App\User\Domain\Repository\UserRepositoryInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\JsonResponse;
 
 final class UpdateUserController extends AbstractController
 {
     private UserRepositoryInterface $userRepository;
+    private ApiResponseInterface $apiResponseInterface;
 
     public function __construct(
-        UserRepositoryInterface $userRepository
+        UserRepositoryInterface $userRepository,
+        ApiResponseInterface $apiResponseInterface
     )
     {
         $this->userRepository = $userRepository;
+        $this->apiResponseInterface = $apiResponseInterface;
     }
 
     public function updateUser(Request $request): JsonResponse
@@ -69,7 +75,7 @@ final class UpdateUserController extends AbstractController
 
         $this->entityManager->saveUser($user);
 
-        return $this->responseFormat->createSuccess(null);
+        return $this->apiResponseInterface->createResponse($jsonData, 'success', Response::HTTP_OK);
     }
 
     public function resetUserApiKey(Request $request): JsonResponse
@@ -91,7 +97,7 @@ final class UpdateUserController extends AbstractController
             'newApiKey' => $generatedApiKey
         ]);
 
-        return JsonResponse::fromJsonString($jsonData);
+        return $this->apiResponseInterface->createResponse($jsonData, 'success', Response::HTTP_OK);
     }
 
     public function resetUserPassword(Request $request): JsonResponse
@@ -118,7 +124,7 @@ final class UpdateUserController extends AbstractController
     public function blockUser(Request $request, int $id): JsonResponse
     {
         // Deny access to this function, if the user is not an administrator.
-        $this->denyAccessUnlessGranted('ROLE_ADMIN');
+        $this->denyAccessUnlessGranted(User::ROLE_ADMIN);
 
         // Find the user by the 'id' provided.
         $user = $this->userRepository->findOneBy(['id' => $id]);
@@ -131,13 +137,13 @@ final class UpdateUserController extends AbstractController
 
         $this->userRepository->saveUser($user);
 
-        return JsonResponse::fromJsonString('');
+        return $this->apiResponseInterface->createResponse('', 'success', Response::HTTP_OK);
     }
 
     public function unblockUser(Request $request, int $id): JsonResponse
     {
         // Deny access to this function, if the user is not an administrator.
-        $this->denyAccessUnlessGranted('ROLE_ADMIN');
+        $this->denyAccessUnlessGranted(User::ROLE_ADMIN);
 
         // Find the user by the 'id' provided.
         $user = $this->userRepository->findOneBy(['id' => $id]);
@@ -150,6 +156,6 @@ final class UpdateUserController extends AbstractController
 
         $this->userRepository->saveUser($user);
 
-        return JsonResponse::fromJsonString('');
+        return $this->apiResponseInterface->createResponse('', 'success', Response::HTTP_OK);
     }
 }

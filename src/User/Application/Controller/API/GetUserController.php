@@ -2,6 +2,7 @@
 
 namespace App\User\Application\Controller\API;
 
+use App\User\Domain\Entity\User;
 use App\User\Application\ApiResponse\ApiResponseInterface;
 use App\User\Domain\Repository\UserRepositoryInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -33,7 +34,7 @@ final class GetUserController extends AbstractController
     public function getUsersInformation(Request $request): JsonResponse
     {
         // Deny access to this function, if the user is not an administrator.
-        $this->denyAccessUnlessGranted('ROLE_ADMIN');
+        $this->denyAccessUnlessGranted(User::ROLE_ADMIN);
 
         $paginationPage = $request->query->get('page') ?? 1;
         $paginationLimit = $request->query->get('pageLimit') ?? 10;
@@ -48,7 +49,7 @@ final class GetUserController extends AbstractController
     public function getUserInformation(Request $request, int $id): JsonResponse
     {
         // Deny access to this function, if the user is not an administrator.
-        $this->denyAccessUnlessGranted('ROLE_ADMIN');
+        $this->denyAccessUnlessGranted(User::ROLE_ADMIN);
 
         $user = $this->userRepository->findUser($id);
         if (null === $user)
@@ -58,7 +59,7 @@ final class GetUserController extends AbstractController
 
         $jsonData = $this->serializer->serialize($user, 'json', [AbstractNormalizer::IGNORED_ATTRIBUTES => ['userIdentifier', 'password', 'apiKey']]);
 
-        return JsonResponse::fromJsonString($jsonData);
+        return $this->apiResponseInterface->createResponse($jsonData, 'success', Response::HTTP_OK);
     }
 
     public function getUserProfile(Request $request): JsonResponse
@@ -73,6 +74,6 @@ final class GetUserController extends AbstractController
 
         $jsonData = $this->serializer->serialize($user, 'json', [AbstractNormalizer::IGNORED_ATTRIBUTES => ['userIdentifier', 'password', 'apiKey']]);
 
-        return JsonResponse::fromJsonString($jsonData);
+        return $this->apiResponseInterface->createResponse($jsonData, 'success', Response::HTTP_OK);
     }
 }

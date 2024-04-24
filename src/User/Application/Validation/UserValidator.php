@@ -16,7 +16,7 @@ final class UserValidator
         $this->userRepository = $userRepository;
     }
 
-    public function validateUserFirstName($firstName): bool
+    public static function validateUserFirstName($firstName): bool
     {
         if (!preg_match('/^[a-zA-Z]+$/', $firstName) || strlen($firstName) < 2)
         {
@@ -26,7 +26,7 @@ final class UserValidator
         return true;
     }
 
-    public function validateUserLastName($lastName): bool
+    public static function validateUserLastName($lastName): bool
     {
         if (!preg_match('/^[a-zA-Z]+$/', $lastName) || strlen($lastName) < 2)
         {

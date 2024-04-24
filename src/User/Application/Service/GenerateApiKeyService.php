@@ -6,7 +6,7 @@ use App\User\Domain\Entity\User;
 use App\User\Domain\Repository\UserRepositoryInterface;
 use Symfony\Component\String\ByteString;
 
-final class GenerateApiKeyService
+class GenerateApiKeyService
 {
     private UserRepositoryInterface $userRepository;
 

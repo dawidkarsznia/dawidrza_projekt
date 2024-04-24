@@ -6,7 +6,7 @@ use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Email;
 use Symfony\Component\Serializer\SerializerInterface;
 
-final class SendEmailService
+class SendEmailService
 {
     private MailerInterface $mailer;
     private SerializerInterface $serializer;
