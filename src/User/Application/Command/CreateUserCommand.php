@@ -5,7 +5,6 @@ namespace App\User\Application\Command;
 use App\User\Domain\Entity\User;
 use App\User\Domain\Repository\UserRepositoryInterface;
 use App\User\Application\Service\CreateUserService;
-use App\User\Application\Service\SendEmailService;
 use App\User\Application\Service\GenerateApiKeyService;
 use App\User\Application\Service\GeneratePasswordService;
 use App\User\Application\Validation\UserValidator;
@@ -27,7 +26,6 @@ final class CreateUserCommand extends Command
 {
     private UserRepositoryInterface $userRepository;
     private CreateUserService $createUserService;
-    private SendEmailService $sendEmailService;
     private UserValidator $userValidator;
     private GenerateApiKeyService $generateApiKeyService;
     private GeneratePasswordService $generatePasswordService;
@@ -36,14 +34,12 @@ final class CreateUserCommand extends Command
     public function __construct(
         UserRepositoryInterface $userRepository,
         CreateUserService $createUserService,
-        SendEmailService $sendEmailService,
         GenerateApiKeyService $generateApiKeyService,
         GeneratePasswordService $generatePasswordService,
         UserValidator $userValidator)
     {
         $this->userRepository = $userRepository;
         $this->createUserService = $createUserService;
-        $this->sendEmailService = $sendEmailService;
         $this->generateApiKeyService = $generateApiKeyService;
         $this->generatePasswordService = $generatePasswordService;
         $this->userValidator = $userValidator;
@@ -130,13 +126,6 @@ final class CreateUserCommand extends Command
         $this->generateApiKeyService->handle($user);
 
         $this->userRepository->saveUser($user);
-
-        // TODO: Send the newly generated password via e-mail.
-        /* $this->sendEmailService->handle(
-            $input->getArgument('email'),
-            'Newly created password to be changed.',
-            sprintf('%s', $plainPassword)
-        ); */
 
         // For debugging.
         $output->writeln($plainPassword);

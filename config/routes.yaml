@@ -34,25 +34,25 @@ api_user_delete:
 
 api_user_update:
     path: /api/users/{id}
-    controller: App\User\Application\Controller\API\UpdateUserController::blockUser
+    controller: App\User\Application\Controller\API\UpdateUserController::updateUser
     methods: PATCH
 
 api_user_reset_password:
     path: /api/reset-password
-    controller: App\User\Application\Controller\API\UpdateUserController::resetUserPassword
+    controller: App\User\Application\Controller\API\ResetUserController::resetUserPassword
     methods: POST
 
 api_user_reset_api_key:
     path: /api/reset-key
-    controller: App\User\Application\Controller\API\UpdateUserController::resetUserApiKey
+    controller: App\User\Application\Controller\API\ResetUserController::resetUserApiKey
     methods: POST
 
 api_user_block:
-    path: /api/users/{id}/block
-    controller: App\User\Application\Controller\API\UpdateUserController::blockUser
+    path: /api/users/block/{id}
+    controller: App\User\Application\Controller\API\BlockUserController::blockUser
     methods: POST
 
 api_user_unblock:
-    path: /api/users/{id}/unblock
-    controller: App\User\Application\Controller\API\UpdateUserController::unblockUser
+    path: /api/users/unblock/{id}
+    controller: App\User\Application\Controller\API\BlockUserController::unblockUser
     methods: POST

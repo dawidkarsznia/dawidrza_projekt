@@ -7,173 +7,246 @@ use App\User\Domain\Repository\UserRepositoryInterface;
 use App\User\Application\Service\GenerateApiKeyService;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 
 class CreateUserControllerTest extends WebTestCase
 {
-    function testCreateUserUnauthorized(): void
+    private const AUTHORIZED_USER_FIRST_NAME = 'Jan';
+    private const AUTHORIZED_USER_LAST_NAME = 'Kowalski';
+    private const AUTHORIZED_USER_EMAIL = 'jankowalski@gmail.com';
+
+    private function createTest(string $testBody = '', bool $isAuthorized = true, bool $incorrectApiKey = false): Response
     {
         $client = static::createClient();
 
+        // Create an authorized user to test our API with.
         $authorizedUser = new User();
-        User::registerUser($authorizedUser, 'testFirst', 'testLast', 'testEmail@gmail.com', [User::ROLE_ADMIN], 'testPasswordHash', '');
+        User::registerUser($authorizedUser, $this::AUTHORIZED_USER_FIRST_NAME, $this::AUTHORIZED_USER_LAST_NAME, $this::AUTHORIZED_USER_EMAIL, [], 'testPasswordHash', '');
+        if ($isAuthorized)
+        {
+            $authorizedUser->setRoles([User::ROLE_ADMIN]);
+        }
 
         $userRepository = static::getContainer()->get(UserRepositoryInterface::class);
 
-        $generateApiKeyService = static::getContainer()->get(GenerateApiKeyService::class);
-        $apiKey = $generateApiKeyService->handle($authorizedUser);
+        // Set the authentication field to the API key or the incorrect value.
+        if (true === $incorrectApiKey)
+        {
+            $client->setServerParameter('HTTP_AUTHORIZATION', 'incorrectApiKey');
+        }
+        else
+        {
+            $generateApiKeyService = static::getContainer()->get(GenerateApiKeyService::class);
+            $apiKey = $generateApiKeyService->handle($authorizedUser);
+
+            $client->setServerParameter('HTTP_AUTHORIZATION', $apiKey);
+        }
 
         $userRepository->saveUser($authorizedUser);
 
-        $client->setServerParameter('HTTP_AUTHORIZATION', 'incorrectApiKey');
-
-        $requestBody = json_encode([
-            'firstName' => 'Jan',
-            'lastName' => 'Kowalski',
-            'email' => 'jankowalski@gmail.com'
-        ]);
-
-        $crawler = $client->request('POST', '/api/users', [], [], [], $requestBody);
-
-        $responseCode = $client->getResponse()->getStatusCode();
-        $response = json_decode($client->getResponse()->getContent(), true);
+        $crawler = $client->request('POST', '/api/users', [], [], [], $testBody);
 
         $userRepository->removeUser($authorizedUser);
+
+        return $client->getResponse();
+    }
+
+    public function testCreateUserUnauthorized(): void
+    {
+        $requestBody = json_encode([
+            'firstName' => 'Anna',
+            'lastName' => 'Nowak',
+            'email' => 'anna_nowak@gmail.com'
+        ]);
+
+        $response = $this->createTest($requestBody, false);
+        $responseCode = $response->getStatusCode();
+        $responseContent = json_decode($response->getContent(), true);
+
+        $this->assertEquals($responseCode, Response::HTTP_FORBIDDEN);
+        $this->assertEquals($responseContent['status'], 'fail');
+
+        $userRepository = static::getContainer()->get(UserRepositoryInterface::class);
+        $createdUser = $userRepository->findOneUserBy(['email' => 'anna_nowak@gmail.com']);
+        $this->assertEquals($createdUser, null);
+    }
+
+    public function testCreateUserWrongKey(): void
+    {
+        $requestBody = json_encode([
+            'firstName' => 'Anna',
+            'lastName' => 'Nowak',
+            'email' => 'anna_nowak@gmail.com'
+        ]);
+
+        $response = $this->createTest($requestBody, true, true);
+        $responseCode = $response->getStatusCode();
+        $responseContent = json_decode($response->getContent(), true);
 
         $this->assertEquals($responseCode, Response::HTTP_NOT_FOUND);
-        $this->assertEquals($response['status'], 'fail');
-    }
-
-    function testCreateUserWrongFirstName(): void
-    {
-        $client = static::createClient();
-
-        $authorizedUser = new User();
-        User::registerUser($authorizedUser, 'testFirst', 'testLast', 'testEmail@gmail.com', [User::ROLE_ADMIN], 'testPasswordHash', '');
+        $this->assertEquals($responseContent['status'], 'fail');
 
         $userRepository = static::getContainer()->get(UserRepositoryInterface::class);
+        $createdUser = $userRepository->findOneUserBy(['email' => 'anna_nowak@gmail.com']);
+        $this->assertEquals($createdUser, null);
+    }
 
-        $generateApiKeyService = static::getContainer()->get(GenerateApiKeyService::class);
-        $apiKey = $generateApiKeyService->handle($authorizedUser);
-
-        $userRepository->saveUser($authorizedUser);
-
-        $client->setServerParameter('HTTP_AUTHORIZATION', $apiKey);
-
+    public function testCreateUserEmptyFirstName(): void
+    {
         $requestBody = json_encode([
-            'firstName' => 'Jan123',
-            'lastName' => 'Kowalski',
-            'email' => 'jankowalski@gmail.com'
+            'lastName' => 'Nowak',
+            'email' => 'anna_nowak@gmail.com'
         ]);
 
-        $crawler = $client->request('POST', '/api/users', [], [], [], $requestBody);
-
-        $responseCode = $client->getResponse()->getStatusCode();
-        $response = json_decode($client->getResponse()->getContent(), true);
-
-        $userRepository->removeUser($authorizedUser);
+        $response = $this->createTest($requestBody);
+        $responseCode = $response->getStatusCode();
+        $responseContent = json_decode($response->getContent(), true);
 
         $this->assertEquals($responseCode, Response::HTTP_BAD_REQUEST);
-        $this->assertEquals($response['status'], 'fail');
-    }
-
-    function testCreateUserWrongLastName(): void
-    {
-        $client = static::createClient();
-
-        $authorizedUser = new User();
-        User::registerUser($authorizedUser, 'testFirst', 'testLast', 'testEmail@gmail.com', [User::ROLE_ADMIN], 'testPasswordHash', '');
+        $this->assertEquals($responseContent['status'], 'fail');
 
         $userRepository = static::getContainer()->get(UserRepositoryInterface::class);
+        $createdUser = $userRepository->findOneUserBy(['email' => 'anna_nowak@gmail.com']);
+        $this->assertEquals($createdUser, null);
+    }
 
-        $generateApiKeyService = static::getContainer()->get(GenerateApiKeyService::class);
-        $apiKey = $generateApiKeyService->handle($authorizedUser);
-
-        $userRepository->saveUser($authorizedUser);
-
-        $client->setServerParameter('HTTP_AUTHORIZATION', $apiKey);
-
+    public function testCreateUserWrongFirstName(): void
+    {
         $requestBody = json_encode([
-            'firstName' => 'Jan',
-            'lastName' => 'Kowalski123',
-            'email' => 'jankowalski@gmail.com'
+            'firstName' => 'Anna123',
+            'lastName' => 'Nowak',
+            'email' => 'anna_nowak@gmail.com'
         ]);
 
-        $crawler = $client->request('POST', '/api/users', [], [], [], $requestBody);
-
-        $responseCode = $client->getResponse()->getStatusCode();
-        $response = json_decode($client->getResponse()->getContent(), true);
-
-        $userRepository->removeUser($authorizedUser);
+        $response = $this->createTest($requestBody);
+        $responseCode = $response->getStatusCode();
+        $responseContent = json_decode($response->getContent(), true);
 
         $this->assertEquals($responseCode, Response::HTTP_BAD_REQUEST);
-        $this->assertEquals($response['status'], 'fail');
-    }
-
-    function testCreateUserWrongEmail(): void
-    {
-        $client = static::createClient();
-
-        $authorizedUser = new User();
-        User::registerUser($authorizedUser, 'testFirst', 'testLast', 'testEmail@gmail.com', [User::ROLE_ADMIN], 'testPasswordHash', '');
+        $this->assertEquals($responseContent['status'], 'fail');
 
         $userRepository = static::getContainer()->get(UserRepositoryInterface::class);
+        $createdUser = $userRepository->findOneUserBy(['email' => 'anna_nowak@gmail.com']);
+        $this->assertEquals($createdUser, null);
+    }
 
-        $generateApiKeyService = static::getContainer()->get(GenerateApiKeyService::class);
-        $apiKey = $generateApiKeyService->handle($authorizedUser);
-
-        $userRepository->saveUser($authorizedUser);
-
-        $client->setServerParameter('HTTP_AUTHORIZATION', $apiKey);
-
+    public function testCreateUserEmptyLastName(): void
+    {
         $requestBody = json_encode([
-            'firstName' => 'Jan',
-            'lastName' => 'Kowalski',
+            'firstName' => 'Anna',
+            'email' => 'anna_nowak@gmail.com'
+        ]);
+
+        $response = $this->createTest($requestBody);
+        $responseCode = $response->getStatusCode();
+        $responseContent = json_decode($response->getContent(), true);
+
+        $this->assertEquals($responseCode, Response::HTTP_BAD_REQUEST);
+        $this->assertEquals($responseContent['status'], 'fail');
+
+        $userRepository = static::getContainer()->get(UserRepositoryInterface::class);
+        $createdUser = $userRepository->findOneUserBy(['email' => 'anna_nowak@gmail.com']);
+        $this->assertEquals($createdUser, null);
+    }
+
+    public function testCreateUserWrongLastName(): void
+    {
+        $requestBody = json_encode([
+            'firstName' => 'Anna',
+            'lastName' => 'Nowak123',
+            'email' => 'anna_nowak@gmail.com'
+        ]);
+
+        $response = $this->createTest($requestBody);
+        $responseCode = $response->getStatusCode();
+        $responseContent = json_decode($response->getContent(), true);
+
+        $this->assertEquals($responseCode, Response::HTTP_BAD_REQUEST);
+        $this->assertEquals($responseContent['status'], 'fail');
+        
+        $userRepository = static::getContainer()->get(UserRepositoryInterface::class);
+        $createdUser = $userRepository->findOneUserBy(['email' => 'anna_nowak@gmail.com']);
+        $this->assertEquals($createdUser, null);
+    }
+
+    public function testCreateUserEmptyEmail(): void
+    {
+        $requestBody = json_encode([
+            'firstName' => 'Anna',
+            'lastName' => 'Nowak',
+        ]);
+
+        $response = $this->createTest($requestBody);
+        $responseCode = $response->getStatusCode();
+        $responseContent = json_decode($response->getContent(), true);
+
+        $this->assertEquals($responseCode, Response::HTTP_BAD_REQUEST);
+        $this->assertEquals($responseContent['status'], 'fail');
+
+        $userRepository = static::getContainer()->get(UserRepositoryInterface::class);
+        $createdUser = $userRepository->findOneUserBy(['email' => 'anna_nowak@gmail.com']);
+        $this->assertEquals($createdUser, null);
+    }
+    
+    public function testCreateUserWrongEmail(): void
+    {
+        $requestBody = json_encode([
+            'firstName' => 'Anna',
+            'lastName' => 'Nowak',
             'email' => 'jankowalski'
         ]);
 
-        $crawler = $client->request('POST', '/api/users', [], [], [], $requestBody);
-
-        $responseCode = $client->getResponse()->getStatusCode();
-        $response = json_decode($client->getResponse()->getContent(), true);
-
-        $userRepository->removeUser($authorizedUser);
+        $response = $this->createTest($requestBody);
+        $responseCode = $response->getStatusCode();
+        $responseContent = json_decode($response->getContent(), true);
 
         $this->assertEquals($responseCode, Response::HTTP_BAD_REQUEST);
-        $this->assertEquals($response['status'], 'fail');
-    }
-    
-    function testCreateUser(): void
-    {
-        $client = static::createClient();
-
-        $authorizedUser = new User();
-        User::registerUser($authorizedUser, 'testFirst', 'testLast', 'testEmail@gmail.com', [User::ROLE_ADMIN], 'testPasswordHash', '');
+        $this->assertEquals($responseContent['status'], 'fail');
 
         $userRepository = static::getContainer()->get(UserRepositoryInterface::class);
+        $createdUser = $userRepository->findOneUserBy(['email' => 'anna_nowak@gmail.com']);
+        $this->assertEquals($createdUser, null);
+    }
 
-        $generateApiKeyService = static::getContainer()->get(GenerateApiKeyService::class);
-        $apiKey = $generateApiKeyService->handle($authorizedUser);
-
-        $userRepository->saveUser($authorizedUser);
-
-        $client->setServerParameter('HTTP_AUTHORIZATION', $apiKey);
-
+    public function testCreateUserDuplicateEmail(): void
+    {
         $requestBody = json_encode([
-            'firstName' => 'Jan',
-            'lastName' => 'Kowalski',
-            'email' => 'jankowalski@gmail.com'
+            'firstName' => 'Anna',
+            'lastName' => 'Nowak',
+            'email' => $this::AUTHORIZED_USER_EMAIL
         ]);
 
-        $crawler = $client->request('POST', '/api/users', [], [], [], $requestBody);
+        $response = $this->createTest($requestBody);
+        $responseCode = $response->getStatusCode();
+        $responseContent = json_decode($response->getContent(), true);
 
-        $responseCode = $client->getResponse()->getStatusCode();
-        $response = json_decode($client->getResponse()->getContent(), true);
+        $this->assertEquals($responseCode, Response::HTTP_BAD_REQUEST);
+        $this->assertEquals($responseContent['status'], 'fail');
 
-        $createdUser = $userRepository->findOneUserBy(['email' => 'jankowalski@gmail.com']);
-        $userRepository->removeUser($authorizedUser);
-        $userRepository->removeUser($createdUser);
+        $userRepository = static::getContainer()->get(UserRepositoryInterface::class);
+        $createdUser = $userRepository->findOneUserBy(['email' => 'anna_nowak@gmail.com']);
+        $this->assertEquals($createdUser, null);
+    }
+    
+    public function testCreateUser(): void
+    {
+        $requestBody = json_encode([
+            'firstName' => 'Anna',
+            'lastName' => 'Nowak',
+            'email' => 'anna_nowak@gmail.com'
+        ]);
+
+        $response = $this->createTest($requestBody);
+        $responseCode = $response->getStatusCode();
+        $responseContent = json_decode($response->getContent(), true);
 
         $this->assertEquals($responseCode, Response::HTTP_OK);
-        $this->assertEquals($response['status'], 'success');
+        $this->assertEquals($responseContent['status'], 'success');
+
+        $userRepository = static::getContainer()->get(UserRepositoryInterface::class);
+        $createdUser = $userRepository->findOneUserBy(['email' => 'anna_nowak@gmail.com']);
+        $this->assertNotEquals($createdUser, null);
+
+        $userRepository->removeUser($createdUser);
     }
 }

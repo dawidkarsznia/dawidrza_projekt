@@ -45,7 +45,7 @@ final class UserValidator
 
         if (null !== $this->userRepository->findOneUserBy(['email' => $email]))
         {
-            return true;
+            return false;
         }
 
         return true;

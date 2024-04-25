@@ -3,15 +3,16 @@
 namespace App\User\Application\Controller\API;
 
 use App\User\Domain\Entity\User;
-use App\User\Domain\Repository\UserRepositoryInterface;
 use App\User\Application\ApiResponse\ApiResponseInterface;
+use App\User\Domain\Repository\UserRepositoryInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 
-final class DeleteUserController extends AbstractController
+final class BlockUserController extends AbstractController
 {
     private UserRepositoryInterface $userRepository;
     private ApiResponseInterface $apiResponseInterface;
@@ -25,12 +26,28 @@ final class DeleteUserController extends AbstractController
         $this->apiResponseInterface = $apiResponseInterface;
     }
 
-    public function deleteUser(Request $request, int $id): JsonResponse
+    public function blockUser(Request $request, int $id): JsonResponse
     {
         // Deny access to this function, if the user is not an administrator.
-        if (!$this->isGranted(User::ROLE_ADMIN, null)) {
-            throw $this->createAccessDeniedException('Access denied.');
+        $this->denyAccessUnlessGranted(User::ROLE_ADMIN);
+
+        // Find the user by the 'id' provided.
+        $user = $this->userRepository->findOneUserBy(['id' => $id]);
+        if (null === $user)
+        {
+            throw new NotFoundHttpException('The desired resource could not be found.');
         }
+
+        $user->setActive(false);
+
+        $this->userRepository->saveUser($user);
+
+        return $this->apiResponseInterface->createResponse('', 'success', Response::HTTP_OK);
+    }
+
+    public function unblockUser(Request $request, int $id): JsonResponse
+    {
+        $this->denyAccessUnlessGranted(User::ROLE_ADMIN);
 
         $user = $this->userRepository->findOneBy(['id' => $id]);
         if (null === $user)
@@ -38,7 +55,9 @@ final class DeleteUserController extends AbstractController
             throw new NotFoundHttpException('The desired resource could not be found.');
         }
 
-        $this->userRepository->removeUser($user);
+        $user->setActive(true);
+
+        $this->userRepository->saveUser($user);
 
         return $this->apiResponseInterface->createResponse('', 'success', Response::HTTP_OK);
     }

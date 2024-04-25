@@ -8,133 +8,131 @@ use App\User\Application\Service\GeneratePasswordService;
 use App\User\Application\Service\GenerateApiKeyService;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 
 class DeleteUserControllerTest extends WebTestCase
 {
-    public function testDeleteUserUnauthorized(): void
-    {
-        $client = static::createClient();
+    private const AUTHORIZED_USER_FIRST_NAME = 'Jan';
+    private const AUTHORIZED_USER_LAST_NAME = 'Kowalski';
+    private const AUTHORIZED_USER_EMAIL = 'jankowalski@gmail.com';
 
+    private function createTest(KernelBrowser $client, int $userId, bool $isAuthorized = true, bool $incorrectApiKey = false): Response
+    {
         $authorizedUser = new User();
-        $testUser = new User();
-        User::registerUser($authorizedUser, 'testFirst', 'testLast', 'testEmail@gmail.com', [], 'testPasswordHash', '');
-        User::registerUser($testUser, 'testFirst', 'testLast', 'testEmail2@gmail.com', [], 'testPasswordHash2', 'testApiKey');
+        User::registerUser($authorizedUser, $this::AUTHORIZED_USER_FIRST_NAME, $this::AUTHORIZED_USER_LAST_NAME, $this::AUTHORIZED_USER_EMAIL, [], 'testPasswordHash', '');
+        if ($isAuthorized)
+        {
+            $authorizedUser->setRoles([User::ROLE_ADMIN]);
+        }
 
         $userRepository = static::getContainer()->get(UserRepositoryInterface::class);
 
-        $generateApiKeyService = static::getContainer()->get(GenerateApiKeyService::class);
-        $apiKey = $generateApiKeyService->handle($authorizedUser);
+        if (true === $incorrectApiKey)
+        {
+            $client->setServerParameter('HTTP_AUTHORIZATION', 'incorrectApiKey');
+        }
+        else
+        {
+            $generateApiKeyService = static::getContainer()->get(GenerateApiKeyService::class);
+            $apiKey = $generateApiKeyService->handle($authorizedUser);
+
+            $client->setServerParameter('HTTP_AUTHORIZATION', $apiKey);
+        }
 
         $userRepository->saveUser($authorizedUser);
-        $userRepository->saveUser($testUser);
-        $testUserId = $testUser->getId();
 
-        $client->setServerParameter('HTTP_AUTHORIZATION', $apiKey);
 
-        $crawler = $client->request('DELETE', '/api/users/' . $testUserId);
+        $path = '/api/users/' . $userId;
+        $crawler = $client->request('DELETE', $path);
 
-        $responseCode = $client->getResponse()->getStatusCode();
-        $response = json_decode($client->getResponse()->getContent(), true);
-
-        $userRepository->removeUser($testUser);
         $userRepository->removeUser($authorizedUser);
 
+        return $client->getResponse();
+    }
+
+    public function testDeleteUserUnauthorized(): void
+    {
+        $client = static::createClient();
+        $userRepository = static::getContainer()->get(UserRepositoryInterface::class);
+
+        $testUser = new User();
+        User::registerUser($testUser, 'testFirst', 'testLast', 'testEmail2@gmail.com', [], 'testPasswordHash2', 'testApiKey');
+        $userRepository->saveUser($testUser);
+
+        $response = $this->createTest($client, $testUser->getId(), false);
+        $responseCode = $response->getStatusCode();
+        $responseContent = json_decode($response->getContent(), true);
+
         $this->assertEquals($responseCode, Response::HTTP_FORBIDDEN);
-        $this->assertEquals($response['status'], 'fail');
+        $this->assertEquals($responseContent['status'], 'fail');
+
+        $commitedUser = $userRepository->findOneUserBy(['id' => $testUser->getId()]);
+        $this->assertNotEquals($commitedUser, null);
+
+        $userRepository->removeUser($testUser);
     }
 
     public function testDeleteUserWrongId(): void
     {
         $client = static::createClient();
-
-        $authorizedUser = new User();
-        $testUser = new User();
-        User::registerUser($authorizedUser, 'testFirst', 'testLast', 'testEmail@gmail.com', [], 'testPasswordHash', '');
-        User::registerUser($testUser, 'testFirst', 'testLast', 'testEmail2@gmail.com', [], 'testPasswordHash2', 'testApiKey');
-
         $userRepository = static::getContainer()->get(UserRepositoryInterface::class);
 
-        $generateApiKeyService = static::getContainer()->get(GenerateApiKeyService::class);
-        $apiKey = $generateApiKeyService->handle($authorizedUser);
-
-        $userRepository->saveUser($authorizedUser);
+        $testUser = new User();
+        User::registerUser($testUser, 'testFirst', 'testLast', 'testEmail2@gmail.com', [], 'testPasswordHash2', 'testApiKey');
         $userRepository->saveUser($testUser);
-        $testUserId = $testUser->getId();
 
-        $client->setServerParameter('HTTP_AUTHORIZATION', 'incorrectApiKey');
-
-        $crawler = $client->request('DELETE', '/api/users/' . ($testUserId + 1));
-
-        $responseCode = $client->getResponse()->getStatusCode();
-        $response = json_decode($client->getResponse()->getContent(), true);
-
-        $userRepository->removeUser($testUser);
-        $userRepository->removeUser($authorizedUser);
+        $response = $this->createTest($client, $testUser->getId() + 2);
+        $responseCode = $response->getStatusCode();
+        $responseContent = json_decode($response->getContent(), true);
 
         $this->assertEquals($responseCode, Response::HTTP_NOT_FOUND);
-        $this->assertEquals($response['status'], 'fail');
+        $this->assertEquals($responseContent['status'], 'fail');
+
+        $commitedUser = $userRepository->findOneUserBy(['id' => $testUser->getId()]);
+        $this->assertNotEquals($commitedUser, null);
+
+        $userRepository->removeUser($testUser);
     }
 
     public function testDeleteUserWrongKey(): void
     {
         $client = static::createClient();
-
-        $authorizedUser = new User();
-        $testUser = new User();
-        User::registerUser($authorizedUser, 'testFirst', 'testLast', 'testEmail@gmail.com', [], 'testPasswordHash', '');
-        User::registerUser($testUser, 'testFirst', 'testLast', 'testEmail2@gmail.com', [], 'testPasswordHash2', 'testApiKey');
-
         $userRepository = static::getContainer()->get(UserRepositoryInterface::class);
 
-        $generateApiKeyService = static::getContainer()->get(GenerateApiKeyService::class);
-        $apiKey = $generateApiKeyService->handle($authorizedUser);
-
-        $userRepository->saveUser($authorizedUser);
+        $testUser = new User();
+        User::registerUser($testUser, 'testFirst', 'testLast', 'testEmail2@gmail.com', [], 'testPasswordHash2', 'testApiKey');
         $userRepository->saveUser($testUser);
-        $testUserId = $testUser->getId();
 
-        $client->setServerParameter('HTTP_AUTHORIZATION', 'incorrectApiKey');
-
-        $crawler = $client->request('DELETE', '/api/users/' . $testUserId);
-
-        $responseCode = $client->getResponse()->getStatusCode();
-        $response = json_decode($client->getResponse()->getContent(), true);
-
-        $userRepository->removeUser($testUser);
-        $userRepository->removeUser($authorizedUser);
+        $response = $this->createTest($client, $testUser->getId(), true, true);
+        $responseCode = $response->getStatusCode();
+        $responseContent = json_decode($response->getContent(), true);
 
         $this->assertEquals($responseCode, Response::HTTP_NOT_FOUND);
-        $this->assertEquals($response['status'], 'fail');
+        $this->assertEquals($responseContent['status'], 'fail');
+
+        $commitedUser = $userRepository->findOneUserBy(['id' => $testUser->getId()]);
+        $this->assertNotEquals($commitedUser, null);
+
+        $userRepository->removeUser($testUser);
     }
 
     public function testDeleteUser(): void
     {
         $client = static::createClient();
-
-        $authorizedUser = new User();
-        $testUser = new User();
-        User::registerUser($authorizedUser, 'testFirst', 'testLast', 'testEmail@gmail.com', [User::ROLE_ADMIN], 'testPasswordHash', '');
-        User::registerUser($testUser, 'testFirst', 'testLast', 'testEmail2@gmail.com', [], 'testPasswordHash2', 'testApiKey');
-
         $userRepository = static::getContainer()->get(UserRepositoryInterface::class);
 
-        $generateApiKeyService = static::getContainer()->get(GenerateApiKeyService::class);
-        $apiKey = $generateApiKeyService->handle($authorizedUser);
-
-        $userRepository->saveUser($authorizedUser);
+        $testUser = new User();
+        User::registerUser($testUser, 'testFirst', 'testLast', 'testEmail2@gmail.com', [], 'testPasswordHash2', 'testApiKey');
         $userRepository->saveUser($testUser);
-        $testUserId = $testUser->getId();
 
-        $client->setServerParameter('HTTP_AUTHORIZATION', $apiKey);
-
-        $crawler = $client->request('DELETE', '/api/users/' . $testUserId);
-
-        $responseCode = $client->getResponse()->getStatusCode();
-        $response = json_decode($client->getResponse()->getContent(), true);
-
-        $userRepository->removeUser($authorizedUser);
+        $response = $this->createTest($client, $testUser->getId());
+        $responseCode = $response->getStatusCode();
+        $responseContent = json_decode($response->getContent(), true);
 
         $this->assertEquals($responseCode, Response::HTTP_OK);
-        $this->assertEquals($response['status'], 'success');
+        $this->assertEquals($responseContent['status'], 'success');
+
+        $commitedUser = $userRepository->findOneUserBy(['id' => $testUser->getId()]);
+        $this->assertEquals($commitedUser, null); 
     }
 }
